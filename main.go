@@ -1,42 +1,49 @@
 package main
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"net/http"
 )
 
-// глобальная переменная для хранения задачи
+// 1. Глобальная переменная task
 var task string
 
-// структура для разбора JSON из тела запроса
-type TaskPayload struct {
+// 2. Структура запроса для POST
+type TaskRequest struct {
 	Task string `json:"task"`
+}
+
+// 3. Обработчик POST — получает JSON и сохраняет task
+func postTask(c echo.Context) error {
+	var req TaskRequest
+
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+	}
+
+	// Сохраняем значение task
+	task = req.Task
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "task saved"})
+}
+
+// 4. Обработчик GET — возвращает приветствие с task
+func getTask(c echo.Context) error {
+	return c.String(http.StatusOK, "hello, "+task)
 }
 
 func main() {
 	e := echo.New()
 
-	// маршруты
-	e.POST("/task", postTaskHandler)
-	e.GET("/", getHelloHandler)
+	// Middleware (по желанию)
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
 
-	// запускаем сервер на порту 8080
-	e.Logger.Fatal(e.Start(":8080"))
-}
+	// Роуты
+	e.POST("/task", postTask)
+	e.GET("/task", getTask)
 
-// POST /task
-func postTaskHandler(c echo.Context) error {
-	payload := new(TaskPayload)
-	if err := c.Bind(payload); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
-	}
-	task = payload.Task
-	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// GET /
-func getHelloHandler(c echo.Context) error {
-	message := "hello, " + task
-	return c.String(http.StatusOK, message)
+	// Запуск сервера
+	e.Start(":8080")
 }
